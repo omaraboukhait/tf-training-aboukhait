@@ -5,7 +5,6 @@
 À la fin de ce lab, vous aurez :
 
 - Compris la structure d'un **resource block** Terraform
-- Écrit votre premier fichier Terraform avec un bloc `terraform` et un bloc `provider`
 - Déployé une **instance EC2** et un **Security Group sans règles** sur AWS
 - Utilisé le workflow complet : `terraform init` → `validate` → `fmt` → `plan` → `apply` → `destroy`
 
@@ -44,6 +43,7 @@ Créez les fichiers suivants :
 ```
 lab2-basics/
 ├── versions.tf
+├── variables.tf
 ├── main.tf
 └── outputs.tf
 ```
@@ -71,51 +71,55 @@ provider "aws" {
 }
 ```
 
-> 💡 Le bloc `terraform` configure les comportements globaux : version minimale de Terraform et providers requis.
-> Le bloc `provider` configure l'authentification et la région AWS. Les credentials sont lus automatiquement depuis les variables d'environnement `AWS_ACCESS_KEY_ID` et `AWS_SECRET_ACCESS_KEY`.
+---
+
+# 🧩 Étape 4 — Variable username
+
+### `variables.tf`
+
+```hcl
+variable "username" {
+  description = "Votre prenom - permet de differencier les ressources entre participants"
+  type        = string
+}
+```
+
+> ⚠️ Cette variable est **obligatoire** — elle sera demandée à chaque `terraform apply` si vous ne la fournissez pas via `-var`. Elle permet d'éviter les conflits de noms entre les 12 participants sur le même compte AWS.
 
 ---
 
-# 🧩 Étape 4 — Security Group sans règles
+# 🧩 Étape 5 — Main.tf complet
 
 ### `main.tf`
 
 ```hcl
 resource "aws_security_group" "lab2_sg" {
-  name        = "lab2-security-group"
-  description = "Security group sans regles - Lab 2"
+  name        = "lab2-sg-${var.username}"
+  description = "Security group sans regles - Lab 2 - ${var.username}"
 
   tags = {
-    Name = "lab2-sg"
-    Lab  = "lab2"
+    Name     = "lab2-sg-${var.username}"
+    Lab      = "lab2"
+    Username = var.username
   }
 }
-```
 
-> 💡 Ce Security Group est créé **sans aucune règle** ingress ou egress — c'est volontaire pour ce lab. On ajoutera des règles dans le Lab 4 avec les dynamic blocks.
-
----
-
-# 🧩 Étape 5 — Instance EC2
-
-Ajoutez dans `main.tf` :
-
-```hcl
 resource "aws_instance" "lab2_instance" {
   ami                    = "ami-0694d931cee176e7d"
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.lab2_sg.id]
 
   tags = {
-    Name = "lab2-instance"
-    Lab  = "lab2"
+    Name     = "lab2-instance-${var.username}"
+    Lab      = "lab2"
+    Username = var.username
   }
 }
 ```
 
-> 💡 `aws_security_group.lab2_sg.id` est une **dépendance implicite** — Terraform crée le Security Group avant l'instance automatiquement, sans qu'on ait besoin de le préciser.
+> 💡 `aws_security_group.lab2_sg.id` est une **dépendance implicite** — Terraform crée le Security Group avant l'instance automatiquement.
 
-> ⚠️ L'AMI `ami-0694d931cee176e7d` est une Amazon Linux 2023 valide en `eu-west-1`. Si vous utilisez une autre région, demandez l'AMI correspondante au formateur.
+> ⚠️ L'AMI `ami-0694d931cee176e7d` est une Amazon Linux 2023 valide en `eu-west-1`.
 
 ---
 
@@ -155,9 +159,7 @@ output "security_group_name" {
 terraform init
 ```
 
-Résultat attendu : téléchargement du provider AWS dans `.terraform/`
-
-### 2. Valider la configuration
+### 2. Valider
 
 ```bash
 terraform validate
@@ -168,29 +170,27 @@ Résultat attendu :
 Success! The configuration is valid.
 ```
 
-### 3. Formater le code
+### 3. Formater
 
 ```bash
 terraform fmt
 ```
 
-> 💡 `terraform fmt` corrige automatiquement l'indentation et l'alignement de votre code.
-
 ### 4. Planifier
 
 ```bash
-terraform plan
+terraform plan -var="username=<votre-prenom>"
 ```
 
-> 📋 Lisez attentivement le plan — il liste les **2 ressources** qui vont être créées : le Security Group et l'instance EC2.
+> 📋 Remplacez `<votre-prenom>` par votre prénom en minuscules sans accent. Ex : `terraform plan -var="username=alice"`
 
 ### 5. Appliquer
 
 ```bash
-terraform apply
+terraform apply -var="username=<votre-prenom>"
 ```
 
-Tapez `yes` pour confirmer. Attendez la fin du déploiement (~30 secondes).
+Tapez `yes` pour confirmer.
 
 ### 6. Vérifier les outputs
 
@@ -203,15 +203,14 @@ terraform output
 # 🧩 Étape 8 — Vérification sur AWS
 
 ```bash
-# Vérifier l'instance EC2
+# Remplacez <votre-prenom> par votre prénom
 aws ec2 describe-instances \
-  --filters "Name=tag:Lab,Values=lab2" \
+  --filters "Name=tag:Username,Values=<votre-prenom>" \
   --query "Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress]" \
   --output table
 
-# Vérifier le Security Group
 aws ec2 describe-security-groups \
-  --filters "Name=tag:Lab,Values=lab2" \
+  --filters "Name=tag:Username,Values=<votre-prenom>" \
   --query "SecurityGroups[*].[GroupId,GroupName]" \
   --output table
 ```
@@ -220,20 +219,18 @@ aws ec2 describe-security-groups \
 
 # 🧩 Étape 9 — Explorer les dépendances
 
-Terraform peut générer un graphe de dépendances entre les ressources :
-
 ```bash
 terraform graph
 ```
 
-> 💡 La sortie est au format DOT (Graphviz). On peut y voir clairement que `aws_instance.lab2_instance` dépend de `aws_security_group.lab2_sg`.
+> 💡 La sortie au format DOT montre clairement que `aws_instance.lab2_instance` dépend de `aws_security_group.lab2_sg`.
 
 ---
 
 # 🧩 Étape 10 — Nettoyage
 
 ```bash
-terraform destroy
+terraform destroy -var="username=<votre-prenom>"
 ```
 
 Tapez `yes` pour confirmer.
@@ -248,10 +245,10 @@ Tapez `yes` pour confirmer.
 |---|---------|--------|
 | 1 | `terraform init` réussi, provider AWS téléchargé | ☐ |
 | 2 | `terraform validate` retourne "Success" | ☐ |
-| 3 | `terraform plan` affiche 2 ressources à créer | ☐ |
+| 3 | `terraform plan` affiche 2 ressources avec votre prénom | ☐ |
 | 4 | `terraform apply` crée l'instance EC2 et le SG | ☐ |
-| 5 | `terraform output` affiche l'instance ID, l'IP et le SG | ☐ |
-| 6 | Instance et SG visibles via `aws ec2 describe-*` | ☐ |
+| 5 | `terraform output` affiche l'instance ID et le SG | ☐ |
+| 6 | Ressources visibles avec le tag `Username=<votre-prenom>` | ☐ |
 | 7 | `terraform destroy` supprime les 2 ressources | ☐ |
 
 ---
@@ -260,10 +257,10 @@ Tapez `yes` pour confirmer.
 
 | Problème | Cause | Solution |
 |----------|-------|----------|
+| `Reference to undeclared resource` | `main.tf` incomplet ou vide | Vérifier que les 2 ressources sont dans `main.tf` |
 | `Error: No valid credential sources` | Credentials AWS manquants | Relancer `export AWS_ACCESS_KEY_ID=...` |
-| `Error: InvalidAMIID` | AMI non disponible dans la région | Vérifier que la région est `eu-west-1` |
-| `Error: UnauthorizedOperation` | Droits IAM insuffisants | Contacter le formateur |
-| `Error: provider not found` | `terraform init` non exécuté | Relancer `terraform init` |
+| `Error: InvalidAMIID` | Mauvaise région | Vérifier que la région est `eu-west-1` |
+| `var.username` demandé en boucle | `-var` oublié | Ajouter `-var="username=<prenom>"` à la commande |
 
 ---
 
