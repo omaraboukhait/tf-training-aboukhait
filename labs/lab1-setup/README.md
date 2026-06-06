@@ -26,29 +26,31 @@ Avant de commencer, assurez-vous d'avoir :
 
 ---
 
-# 🧩 Étape 1 — Créer votre repo depuis le template
+# 🧩 Étape 1 — Forker le repo de formation
 
-1. Ouvrez le lien du **repo template** fourni par le formateur :
+1. Ouvrez le repo de formation :
 
    👉 **https://github.com/SAIDI-HAMZA/tf-training-template**
 
-2. En haut à droite, cliquez sur **Use this template** → **Create a new repository**
+2. En haut à droite, cliquez sur **Fork** → **Create a new fork**
 
 3. Renseignez les informations suivantes :
    - **Repository name** : `terraform-training-<votre-prenom>`  
      *(ex : `terraform-training-alice`)*
    - **Owner** : votre compte GitHub personnel
-   - **Visibility** : `Private` (recommandé)
+   - Décochez **"Copy the main branch only"**
 
-4. Cliquez sur **Create repository from template**
+4. Cliquez sur **Create fork**
 
-✅ Vous disposez maintenant de votre propre copie du repo de formation.
+✅ Vous disposez maintenant de votre propre fork du repo de formation.
+
+> 💡 **Pourquoi un fork ?** Contrairement à "Use this template", un fork reste lié au repo original. Si le formateur pousse une mise à jour, vous pouvez vous resynchroniser en un clic depuis l'interface GitHub via le bouton **"Sync fork"** sur votre repo.
 
 ---
 
 # 🧩 Étape 2 — Démarrer votre GitHub Codespace
 
-1. Sur la page de **votre** repo, cliquez sur le bouton vert **`< > Code`**
+1. Sur la page de **votre fork**, cliquez sur le bouton vert **`< > Code`**
 2. Sélectionnez l'onglet **Codespaces**
 3. Cliquez sur **Create codespace on main**
 
