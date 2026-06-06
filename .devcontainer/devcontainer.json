@@ -1,0 +1,30 @@
+{
+  "name": "Terraform Training",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.terraform",
+        "amazonwebservices.aws-toolkit-vscode",
+        "humao.rest-client",
+        "ms-vscode.makefile-tools",
+        "redhat.vscode-yaml",
+        "esbenp.prettier-vscode"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "hashicorp.terraform",
+        "[terraform]": {
+          "editor.defaultFormatter": "hashicorp.terraform",
+          "editor.formatOnSave": true
+        },
+        "terraform.languageServer.enable": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "postCreateCommand": "echo '✅ Terraform' && terraform version && echo '✅ AWS CLI' && aws --version && echo '\\n🚀 Environnement prêt !'",
+  "remoteUser": "root"
+}
