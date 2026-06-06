@@ -4,7 +4,7 @@
 
 À la fin de ce lab, vous aurez :
 
-- Organisé votre code Terraform selon les **bonnes pratiques** de structuration des fichiers
+- Organisé votre code Terraform selon les **bonnes pratiques**
 - Exporté des attributs de ressources avec les **outputs**
 - Déclaré et utilisé des **variables** avec différents types
 - Assigné des variables via **CLI**, **tfvars** et **variables d'environnement**
@@ -12,36 +12,21 @@
 
 ---
 
-# 🧩 Étape 1 — Structure des fichiers (bonnes pratiques)
+# 🧩 Étape 1 — Structure et fichiers
 
 ```bash
 cd labs/lab5-outputs
 ```
 
-Un projet Terraform bien organisé sépare les responsabilités en fichiers distincts :
-
-```
-lab5-outputs/
-├── backend.tf          ← Configuration du backend S3
-├── versions.tf         ← Version Terraform + providers requis
-├── provider.tf         ← Configuration du provider AWS
-├── variables.tf        ← Déclaration des variables
-├── main.tf             ← Ressources uniquement
-├── outputs.tf          ← Outputs
-└── terraform.tfvars    ← Valeurs des variables
-```
-
-> 💡 Cette séparation facilite la lecture, la maintenance et la réutilisation du code. C'est la convention adoptée par la majorité des équipes Terraform en production.
-
----
-
-# 🧩 Étape 2 — backend.tf
+Créez les fichiers suivants :
 
 ### `backend.tf`
 
 ```hcl
 terraform {
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true
@@ -49,11 +34,7 @@ terraform {
 }
 ```
 
-> 💡 Le backend est isolé dans son propre fichier pour faciliter le changement de backend (local → S3 → Terraform Cloud) sans toucher aux autres fichiers.
-
----
-
-# 🧩 Étape 3 — versions.tf
+> ⚠️ Remplacez `<votre-prenom>` par votre prénom en minuscules sans accent. Ex : `tf-training-alice-982908300187`
 
 ### `versions.tf`
 
@@ -70,10 +51,6 @@ terraform {
 }
 ```
 
----
-
-# 🧩 Étape 4 — provider.tf
-
 ### `provider.tf`
 
 ```hcl
@@ -81,12 +58,6 @@ provider "aws" {
   region = var.region
 }
 ```
-
-> 💡 Le provider est dans son propre fichier — si vous avez plusieurs providers (AWS + Azure par exemple), chacun aura son fichier `provider-aws.tf`, `provider-azure.tf`, etc.
-
----
-
-# 🧩 Étape 5 — variables.tf
 
 ### `variables.tf`
 
@@ -130,10 +101,6 @@ variable "environment" {
 }
 ```
 
----
-
-# 🧩 Étape 6 — main.tf
-
 ### `main.tf`
 
 ```hcl
@@ -162,12 +129,6 @@ resource "aws_instance" "lab5_instance" {
   }
 }
 ```
-
-> 💡 `main.tf` contient **uniquement les ressources**. Plus le projet grandit, plus cette séparation est importante.
-
----
-
-# 🧩 Étape 7 — outputs.tf
 
 ### `outputs.tf`
 
@@ -203,34 +164,15 @@ output "deployment_summary" {
 }
 ```
 
-> 💡 Les outputs peuvent exposer :
-> - Un **attribut spécifique** : `aws_instance.lab5_instance.id`
-> - Un **objet complet** : comme `deployment_summary`
-> - Dans un module, les outputs sont accessibles par d'autres ressources
-
 ---
 
-# 🧩 Étape 8 — Initialiser avec le Backend S3
-
-```bash
-BUCKET_NAME=$(cat $HOME/tf-training-info.txt | awk '{print $NF}')
-
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=terraform.tfstate"
-```
-
----
-
-# 🧩 Étape 9 — Les 3 façons d'assigner les variables
+# 🧩 Étape 2 — Les 3 façons d'assigner les variables
 
 ## Méthode 1 — CLI flag (`-var`)
 
 ```bash
-terraform apply \
-  -var="username=<votre-prenom>" \
-  -var="environment=dev" \
-  -var="instance_type=t2.micro"
+terraform init
+terraform apply -var="username=<votre-prenom>" -var="environment=dev"
 ```
 
 ## Méthode 2 — Fichier tfvars
@@ -243,13 +185,11 @@ environment   = "dev"
 instance_type = "t2.micro"
 ```
 
-Puis appliquez sans `-var` :
-
 ```bash
 terraform apply
 ```
 
-> 💡 Terraform charge automatiquement `terraform.tfvars` s'il est présent dans le dossier. Pour un fichier différent : `terraform apply -var-file="prod.tfvars"`
+> 💡 Terraform charge automatiquement `terraform.tfvars` s'il est présent. Pour un fichier différent : `terraform apply -var-file="prod.tfvars"`
 
 ## Méthode 3 — Variables d'environnement (`TF_VAR_`)
 
@@ -265,10 +205,10 @@ terraform apply
 
 ---
 
-# 🧩 Étape 10 — Tester la validation
+# 🧩 Étape 3 — Tester la validation
 
 ```bash
-# Tester une valeur d'environnement invalide
+# Valeur d'environnement invalide
 terraform plan -var="username=<votre-prenom>" -var="environment=staging"
 ```
 
@@ -279,7 +219,7 @@ Error: Invalid value for variable
 ```
 
 ```bash
-# Tester un type d'instance invalide
+# Type d'instance invalide
 terraform plan -var="username=<votre-prenom>" -var="instance_type=t3.large"
 ```
 
@@ -291,27 +231,27 @@ Error: Invalid value for variable
 
 ---
 
-# 🧩 Étape 11 — Utiliser terraform output
-
-Après le `terraform apply` :
+# 🧩 Étape 4 — Utiliser terraform output
 
 ```bash
-# Afficher tous les outputs
+# Tous les outputs
 terraform output
 
-# Afficher un output spécifique
+# Un output spécifique
 terraform output instance_id
 
-# Afficher en JSON (utile pour les scripts)
+# Format JSON (utile pour les scripts)
 terraform output -json deployment_summary
 
-# Afficher brut sans guillemets (utile dans les pipelines CI/CD)
+# Format brut sans guillemets (utile en CI/CD)
 terraform output -raw instance_id
 ```
 
+> 💡 Les outputs peuvent exposer un **attribut spécifique**, un **objet complet**, ou être utilisés par d'autres modules.
+
 ---
 
-# 🧩 Étape 12 — Nettoyage
+# 🧩 Étape 5 — Nettoyage
 
 ```bash
 terraform destroy -var="username=<votre-prenom>"
@@ -323,15 +263,14 @@ terraform destroy -var="username=<votre-prenom>"
 
 | # | Critère | Validé |
 |---|---------|--------|
-| 1 | Fichiers séparés : `backend.tf`, `versions.tf`, `provider.tf` | ☐ |
-| 2 | `terraform init -backend-config` réussi | ☐ |
-| 3 | Validation bloque `environment=staging` | ☐ |
-| 4 | Validation bloque `instance_type=t3.large` | ☐ |
-| 5 | `terraform apply` via `-var` fonctionne | ☐ |
-| 6 | `terraform apply` via `terraform.tfvars` fonctionne | ☐ |
-| 7 | `terraform apply` via `TF_VAR_` fonctionne | ☐ |
-| 8 | `terraform output -json deployment_summary` affiche un objet JSON | ☐ |
-| 9 | `terraform destroy` supprime les ressources | ☐ |
+| 1 | 6 fichiers séparés créés (`backend.tf`, `versions.tf`, `provider.tf`, `variables.tf`, `main.tf`, `outputs.tf`) | ☐ |
+| 2 | Validation bloque `environment=staging` | ☐ |
+| 3 | Validation bloque `instance_type=t3.large` | ☐ |
+| 4 | `terraform apply` via `-var` fonctionne | ☐ |
+| 5 | `terraform apply` via `terraform.tfvars` fonctionne | ☐ |
+| 6 | `terraform apply` via `TF_VAR_` fonctionne | ☐ |
+| 7 | `terraform output -json deployment_summary` affiche un objet JSON | ☐ |
+| 8 | `terraform destroy` supprime les ressources | ☐ |
 
 ---
 
@@ -339,10 +278,9 @@ terraform destroy -var="username=<votre-prenom>"
 
 | Problème | Cause | Solution |
 |----------|-------|----------|
-| `Error: No value for required variable` | Variable sans default non fournie | Ajouter `-var="username=..."` ou `terraform.tfvars` |
-| `Error: Invalid value for variable` | Validation échouée | Vérifier la valeur fournie |
+| `No value for required variable` | Variable sans default non fournie | Ajouter `-var="username=..."` ou `terraform.tfvars` |
+| `Invalid value for variable` | Validation échouée | Vérifier la valeur fournie |
 | `TF_VAR_` ignoré | Mauvais nom de variable | Vérifier l'orthographe exacte |
-| `Duplicate terraform block` | `backend.tf` et `versions.tf` ont tous les deux un bloc `terraform` | Normal — Terraform fusionne les blocs automatiquement |
 
 ---
 

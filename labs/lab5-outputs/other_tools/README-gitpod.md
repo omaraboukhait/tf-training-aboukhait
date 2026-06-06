@@ -4,22 +4,17 @@
 
 - Organiser le code selon les **bonnes pratiques** Terraform
 - Exporter des attributs avec les **outputs**
-- Déclarer et utiliser des **variables** avec validation
-- Assigner via **CLI**, **tfvars** et **TF_VAR_**
+- Assigner des variables via **CLI**, **tfvars** et **TF_VAR_**
 
 ---
 
-# 🧩 Étape 1 — Préparer l'environnement
+# 🧩 Étape 1 — Créer les fichiers
 
 Reprenez votre environnement GitPod → **https://gitpod.io/workspaces**
 
 ```bash
 cd labs/lab5-outputs
 ```
-
----
-
-# 🧩 Étape 2 — Créer les fichiers (bonnes pratiques)
 
 Créez chaque fichier dans l'éditeur VS Code GitPod :
 
@@ -28,12 +23,16 @@ Créez chaque fichier dans l'éditeur VS Code GitPod :
 ```hcl
 terraform {
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true
   }
 }
 ```
+
+> ⚠️ Remplacez `<votre-prenom>` par votre prénom en minuscules sans accent. Ex : `tf-training-alice-982908300187`
 
 ### `versions.tf`
 
@@ -49,9 +48,7 @@ terraform {
 ### `provider.tf`
 
 ```hcl
-provider "aws" {
-  region = var.region
-}
+provider "aws" { region = var.region }
 ```
 
 ### `variables.tf`
@@ -65,24 +62,18 @@ variable "username" {
     error_message = "Le username doit contenir entre 2 et 20 caractères."
   }
 }
-variable "region" {
-  description = "Region AWS"
-  type        = string
-  default     = "eu-west-1"
-}
+variable "region" { type = string; default = "eu-west-1" }
 variable "instance_type" {
-  description = "Type d'instance EC2"
-  type        = string
-  default     = "t2.micro"
+  type    = string
+  default = "t2.micro"
   validation {
     condition     = contains(["t2.micro", "t2.small", "t2.medium"], var.instance_type)
     error_message = "Le type d'instance doit être t2.micro, t2.small ou t2.medium."
   }
 }
 variable "environment" {
-  description = "Environnement"
-  type        = string
-  default     = "dev"
+  type    = string
+  default = "dev"
   validation {
     condition     = contains(["dev", "prod"], var.environment)
     error_message = "L'environnement doit être dev ou prod."
@@ -122,23 +113,12 @@ output "deployment_summary" {
 
 ---
 
-# 🧩 Étape 3 — Init avec Backend S3
-
-```bash
-BUCKET_NAME=$(grep "bucket" $HOME/tf-training-info.txt | awk '{print $NF}')
-
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=terraform.tfstate"
-```
-
----
-
-# 🧩 Étape 4 — Les 3 façons d'assigner les variables
+# 🧩 Étape 2 — Les 3 façons d'assigner les variables
 
 ## Méthode 1 — CLI flag
 
 ```bash
+terraform init
 terraform apply -var="username=<votre-prenom>" -var="environment=dev"
 ```
 
@@ -166,7 +146,7 @@ terraform apply
 
 ---
 
-# 🧩 Étape 5 — Tester la validation
+# 🧩 Étape 3 — Tester la validation
 
 ```bash
 terraform plan -var="username=<votre-prenom>" -var="environment=staging"
@@ -175,7 +155,7 @@ terraform plan -var="username=<votre-prenom>" -var="instance_type=t3.large"
 
 ---
 
-# 🧩 Étape 6 — Utiliser terraform output
+# 🧩 Étape 4 — Utiliser terraform output
 
 ```bash
 terraform output
@@ -186,7 +166,7 @@ terraform output -raw instance_id
 
 ---
 
-# 🧩 Étape 7 — Nettoyage
+# 🧩 Étape 5 — Nettoyage
 
 ```bash
 terraform destroy -var="username=<votre-prenom>"
@@ -198,12 +178,11 @@ terraform destroy -var="username=<votre-prenom>"
 
 | # | Critère | Validé |
 |---|---------|--------|
-| 1 | Fichiers séparés : `backend.tf`, `versions.tf`, `provider.tf` | ☐ |
-| 2 | `terraform init -backend-config` réussi | ☐ |
-| 3 | Validation bloque `environment=staging` | ☐ |
-| 4 | Les 3 méthodes d'assignation fonctionnent | ☐ |
-| 5 | `terraform output -json` affiche un objet JSON | ☐ |
-| 6 | `terraform destroy` supprime les ressources | ☐ |
+| 1 | 6 fichiers séparés créés | ☐ |
+| 2 | Validation bloque `environment=staging` | ☐ |
+| 3 | Les 3 méthodes d'assignation fonctionnent | ☐ |
+| 4 | `terraform output -json` affiche un objet JSON | ☐ |
+| 5 | `terraform destroy` supprime les ressources | ☐ |
 
 ---
 

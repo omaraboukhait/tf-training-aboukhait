@@ -4,24 +4,18 @@
 
 - Organiser le code selon les **bonnes pratiques** Terraform
 - Exporter des attributs avec les **outputs**
-- Déclarer et utiliser des **variables** avec validation
-- Assigner via **CLI**, **tfvars** et **TF_VAR_**
+- Assigner des variables via **CLI**, **tfvars** et **TF_VAR_**
 
 ---
 
-# 🧩 Étape 1 — Préparer l'environnement
+# 🧩 Étape 1 — Créer les fichiers
 
 ```bash
 bash $HOME/install-terraform.sh
 cd $HOME/terraform-training/lab5-outputs
 ```
 
----
-
-# 🧩 Étape 2 — Créer les fichiers (bonnes pratiques)
-
 ```bash
-# backend.tf
 cat > backend.tf << 'EOF'
 terraform {
   backend "s3" {
@@ -32,7 +26,6 @@ terraform {
 }
 EOF
 
-# versions.tf
 cat > versions.tf << 'EOF'
 terraform {
   required_version = ">= 1.15.0"
@@ -42,14 +35,10 @@ terraform {
 }
 EOF
 
-# provider.tf
 cat > provider.tf << 'EOF'
-provider "aws" {
-  region = var.region
-}
+provider "aws" { region = var.region }
 EOF
 
-# variables.tf
 cat > variables.tf << 'EOF'
 variable "username" {
   description = "Votre prenom"
@@ -59,24 +48,18 @@ variable "username" {
     error_message = "Le username doit contenir entre 2 et 20 caractères."
   }
 }
-variable "region" {
-  description = "Region AWS"
-  type        = string
-  default     = "eu-west-1"
-}
+variable "region" { type = string; default = "eu-west-1" }
 variable "instance_type" {
-  description = "Type d'instance EC2"
-  type        = string
-  default     = "t2.micro"
+  type    = string
+  default = "t2.micro"
   validation {
     condition     = contains(["t2.micro", "t2.small", "t2.medium"], var.instance_type)
     error_message = "Le type d'instance doit être t2.micro, t2.small ou t2.medium."
   }
 }
 variable "environment" {
-  description = "Environnement"
-  type        = string
-  default     = "dev"
+  type    = string
+  default = "dev"
   validation {
     condition     = contains(["dev", "prod"], var.environment)
     error_message = "L'environnement doit être dev ou prod."
@@ -84,7 +67,6 @@ variable "environment" {
 }
 EOF
 
-# main.tf
 cat > main.tf << 'EOF'
 resource "aws_security_group" "lab5_sg" {
   name        = "lab5-sg-${var.username}-${var.environment}"
@@ -99,7 +81,6 @@ resource "aws_instance" "lab5_instance" {
 }
 EOF
 
-# outputs.tf
 cat > outputs.tf << 'EOF'
 output "instance_id" { description = "ID de l'instance EC2" ; value = aws_instance.lab5_instance.id }
 output "instance_public_ip" { description = "IP publique" ; value = aws_instance.lab5_instance.public_ip }
@@ -114,23 +95,12 @@ EOF
 
 ---
 
-# 🧩 Étape 3 — Init avec Backend S3
-
-```bash
-BUCKET_NAME=$(grep "bucket" $HOME/tf-training-info.txt | awk '{print $NF}')
-
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=terraform.tfstate"
-```
-
----
-
-# 🧩 Étape 4 — Les 3 façons d'assigner les variables
+# 🧩 Étape 2 — Les 3 façons d'assigner les variables
 
 ## Méthode 1 — CLI flag
 
 ```bash
+terraform init
 terraform apply -var="username=<votre-prenom>" -var="environment=dev"
 ```
 
@@ -142,6 +112,7 @@ username      = "<votre-prenom>"
 environment   = "dev"
 instance_type = "t2.micro"
 EOF
+
 terraform apply
 ```
 
@@ -155,7 +126,7 @@ terraform apply
 
 ---
 
-# 🧩 Étape 5 — Tester la validation
+# 🧩 Étape 3 — Tester la validation
 
 ```bash
 terraform plan -var="username=<votre-prenom>" -var="environment=staging"
@@ -164,7 +135,7 @@ terraform plan -var="username=<votre-prenom>" -var="instance_type=t3.large"
 
 ---
 
-# 🧩 Étape 6 — Utiliser terraform output
+# 🧩 Étape 4 — Utiliser terraform output
 
 ```bash
 terraform output
@@ -175,7 +146,7 @@ terraform output -raw instance_id
 
 ---
 
-# 🧩 Étape 7 — Nettoyage
+# 🧩 Étape 5 — Nettoyage
 
 ```bash
 terraform destroy -var="username=<votre-prenom>"
@@ -187,13 +158,11 @@ terraform destroy -var="username=<votre-prenom>"
 
 | # | Critère | Validé |
 |---|---------|--------|
-| 1 | Fichiers séparés : `backend.tf`, `versions.tf`, `provider.tf` | ☐ |
-| 2 | `terraform init -backend-config` réussi | ☐ |
-| 3 | Validation bloque `environment=staging` | ☐ |
-| 4 | Validation bloque `instance_type=t3.large` | ☐ |
-| 5 | Les 3 méthodes d'assignation fonctionnent | ☐ |
-| 6 | `terraform output -json` affiche un objet JSON | ☐ |
-| 7 | `terraform destroy` supprime les ressources | ☐ |
+| 1 | 6 fichiers séparés créés | ☐ |
+| 2 | Validation bloque `environment=staging` | ☐ |
+| 3 | Les 3 méthodes d'assignation fonctionnent | ☐ |
+| 4 | `terraform output -json` affiche un objet JSON | ☐ |
+| 5 | `terraform destroy` supprime les ressources | ☐ |
 
 ---
 

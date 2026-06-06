@@ -228,14 +228,10 @@ output "security_group_id" {
 
 # 🧩 Partie C — Initialiser avec le Backend S3
 
-## Étape C1 — terraform init avec backend-config
+## Étape C1 — terraform init
 
 ```bash
-BUCKET_NAME=$(cat $HOME/tf-training-info.txt | awk '{print $NF}')
-
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=lab4/terraform.tfstate"
+terraform init
 ```
 
 Résultat attendu :
@@ -255,7 +251,7 @@ Tapez `yes` pour confirmer.
 ## Étape C3 — Vérifier que le state est dans S3
 
 ```bash
-aws s3 ls s3://${BUCKET_NAME}/lab4/
+aws s3 ls s3://tf-training-<votre-prenom>-982908300187/
 ```
 
 Résultat attendu :
@@ -339,7 +335,7 @@ terraform destroy -var="username=<votre-prenom>"
 |---|---------|--------|
 | 1 | Bucket S3 créé **avec Terraform** via le bootstrap | ☐ |
 | 2 | `terraform output bucket_name` retourne le nom du bucket | ☐ |
-| 3 | `terraform init -backend-config` réussi | ☐ |
+| 3 | `terraform init` réussi | ☐ |
 | 4 | State visible dans S3 après `terraform apply` | ☐ |
 | 5 | `terraform plan` détecte la modification hors Terraform | ☐ |
 | 6 | `terraform refresh` capture le tag ajouté manuellement | ☐ |
@@ -355,7 +351,7 @@ terraform destroy -var="username=<votre-prenom>"
 | Problème | Cause | Solution |
 |----------|-------|----------|
 | `BucketAlreadyExists` | Nom de bucket déjà pris | Vérifier que le nom inclut bien votre prénom et account-id |
-| `Backend init error` | Bucket ou key incorrects | Vérifier les valeurs `-backend-config` |
+| `Backend init error` | Bucket incorrect dans `backend.tf` | Vérifier le nom du bucket dans `backend.tf` |
 | `Error acquiring state lock` | Lock non libéré | `terraform force-unlock <ID>` |
 | `NoSuchBucket` | Bucket non créé | Relancer le bootstrap |
 | `use_lockfile not supported` | Version Terraform < 1.11 | Vérifier `terraform version` |

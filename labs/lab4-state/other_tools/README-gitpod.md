@@ -154,14 +154,10 @@ output "security_group_id" { value = aws_security_group.lab4_sg.id }
 # 🧩 Partie C — Init avec Backend S3
 
 ```bash
-BUCKET_NAME=$(grep "bucket" $HOME/tf-training-info.txt | awk '{print $NF}')
-
-terraform init \
-  -backend-config="bucket=${BUCKET_NAME}" \
-  -backend-config="key=lab4/terraform.tfstate"
+terraform init
 
 terraform apply -var="username=<votre-prenom>"
-aws s3 ls s3://${BUCKET_NAME}/lab4/
+aws s3 ls s3://tf-training-<votre-prenom>-982908300187/
 ```
 
 ---
@@ -211,7 +207,7 @@ terraform destroy -var="username=<votre-prenom>"
 | # | Critère | Validé |
 |---|---------|--------|
 | 1 | Bucket S3 créé **avec Terraform** via le bootstrap | ☐ |
-| 2 | `terraform init -backend-config` réussi | ☐ |
+| 2 | `terraform init` réussi | ☐ |
 | 3 | State visible dans S3 après `terraform apply` | ☐ |
 | 4 | `terraform plan` détecte la modification hors Terraform | ☐ |
 | 5 | `terraform plan` détecte le changement `t2.small` | ☐ |
