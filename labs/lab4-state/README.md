@@ -4,16 +4,17 @@
 
 À la fin de ce lab, vous aurez :
 
-- Créé votre **bucket S3 personnel** pour stocker votre state Terraform
+- Créé votre **bucket S3 personnel** avec Terraform (bootstrap)
 - Configuré un **backend distant S3** avec locking natif (`use_lockfile = true`)
-- Compris le comportement de Terraform face à des **modifications hors Terraform**
-- Compris le comportement face à des **modifications dans le code Terraform**
+- Observé le comportement de Terraform face à des **modifications hors Terraform**
+- Observé le comportement face à des **modifications dans le code Terraform**
 
 ---
 
-# 🧩 Partie A — Bootstrap : Créer votre bucket S3
+# 🧩 Partie A — Bootstrap : Créer votre bucket S3 avec Terraform
 
 > ⚠️ Cette partie se fait **une seule fois** — le bucket sera réutilisé pour tous les labs suivants (Lab 4 à Lab 14).
+> Le bucket bootstrap utilise un **state local** car on ne peut pas utiliser S3 avant que le bucket existe.
 
 ## Étape A1 — Préparer le dossier bootstrap
 
@@ -22,54 +23,107 @@ cd labs/lab4-state
 mkdir bootstrap && cd bootstrap
 ```
 
-## Étape A2 — Créer le bucket S3
+## Étape A2 — Créer les fichiers bootstrap
 
-```bash
-# Remplacez <votre-prenom> par votre prénom en minuscules sans accent
-USERNAME=<votre-prenom>
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-BUCKET_NAME="tf-training-${USERNAME}-${ACCOUNT_ID}"
+### `versions.tf`
 
-echo "Bucket : $BUCKET_NAME"
+```hcl
+terraform {
+  required_version = ">= 1.15.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "eu-west-1"
+}
 ```
 
-```bash
-# Créer le bucket
-aws s3api create-bucket \
-  --bucket $BUCKET_NAME \
-  --region eu-west-1 \
-  --create-bucket-configuration LocationConstraint=eu-west-1
+### `variables.tf`
+
+```hcl
+variable "username" {
+  description = "Votre prenom - permet de nommer votre bucket de maniere unique"
+  type        = string
+}
 ```
 
-```bash
-# Activer le versioning (permet de récupérer un state précédent)
-aws s3api put-bucket-versioning \
-  --bucket $BUCKET_NAME \
-  --versioning-configuration Status=Enabled
+### `main.tf`
+
+```hcl
+data "aws_caller_identity" "current" {}
+
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "tf-training-${var.username}-${data.aws_caller_identity.current.account_id}"
+
+  tags = {
+    Name      = "tf-training-${var.username}"
+    ManagedBy = "Terraform"
+    Username  = var.username
+  }
+}
+
+resource "aws_s3_bucket_versioning" "state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "state" {
+  bucket = aws_s3_bucket.terraform_state.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
 ```
 
-```bash
-# Bloquer l'accès public
-aws s3api put-public-access-block \
-  --bucket $BUCKET_NAME \
-  --public-access-block-configuration \
-    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+### `outputs.tf`
+
+```hcl
+output "bucket_name" {
+  description = "Nom du bucket S3 a utiliser dans tous les labs suivants"
+  value       = aws_s3_bucket.terraform_state.bucket
+}
 ```
 
+## Étape A3 — Déployer le bucket
+
 ```bash
-# Vérifier que le bucket est créé
-aws s3 ls | grep $BUCKET_NAME
+terraform init
+terraform apply -var="username=<votre-prenom>"
 ```
 
-> 💡 Le nom du bucket suit le format `tf-training-<prenom>-<account-id>` — il est **unique** par participant et par compte AWS.
+Tapez `yes` pour confirmer.
 
-## Étape A3 — Sauvegarder le nom du bucket
+## Étape A4 — Sauvegarder le nom du bucket
 
 ```bash
-# Notez votre bucket name — vous en aurez besoin dans tous les labs suivants
+# Récupérer et sauvegarder le nom du bucket
+BUCKET_NAME=$(terraform output -raw bucket_name)
 echo "Mon bucket S3 : $BUCKET_NAME" >> $HOME/tf-training-info.txt
 cat $HOME/tf-training-info.txt
 ```
+
+> 💡 Le state du bootstrap reste **local** dans `bootstrap/terraform.tfstate` — c'est normal et voulu. Ne le supprimez pas.
 
 ---
 
@@ -118,9 +172,7 @@ provider "aws" {
 }
 ```
 
-> 💡 Le bloc `backend "s3"` est volontairement **incomplet** — le `bucket` et la `key` seront passés au `terraform init` via `-backend-config` pour éviter de hardcoder le nom du bucket dans le code.
-
-> 💡 **`use_lockfile = true`** — disponible depuis Terraform 1.11. Permet le locking du state directement sur S3 **sans DynamoDB**. Un fichier `.tflock` est créé dans le bucket pendant les opérations.
+> 💡 `use_lockfile = true` — disponible depuis Terraform 1.11. Permet le locking du state directement sur S3 **sans DynamoDB**.
 
 ### `variables.tf`
 
@@ -179,9 +231,10 @@ output "security_group_id" {
 ## Étape C1 — terraform init avec backend-config
 
 ```bash
-# Remplacez <votre-prenom> et <account-id> par vos valeurs
+BUCKET_NAME=$(cat $HOME/tf-training-info.txt | awk '{print $NF}')
+
 terraform init \
-  -backend-config="bucket=tf-training-<votre-prenom>-<account-id>" \
+  -backend-config="bucket=${BUCKET_NAME}" \
   -backend-config="key=lab4/terraform.tfstate"
 ```
 
@@ -191,18 +244,7 @@ Initializing the backend...
 Successfully configured the backend "s3"!
 ```
 
-> 💡 Le state sera stocké dans S3 à l'adresse :
-> `s3://tf-training-<prenom>-<account-id>/lab4/terraform.tfstate`
-
-## Étape C2 — Vérifier la configuration du backend
-
-```bash
-terraform init -reconfigure \
-  -backend-config="bucket=tf-training-<votre-prenom>-<account-id>" \
-  -backend-config="key=lab4/terraform.tfstate"
-```
-
-## Étape C3 — Déployer
+## Étape C2 — Déployer
 
 ```bash
 terraform apply -var="username=<votre-prenom>"
@@ -210,10 +252,10 @@ terraform apply -var="username=<votre-prenom>"
 
 Tapez `yes` pour confirmer.
 
-## Étape C4 — Vérifier que le state est dans S3
+## Étape C3 — Vérifier que le state est dans S3
 
 ```bash
-aws s3 ls s3://tf-training-<votre-prenom>-<account-id>/lab4/
+aws s3 ls s3://${BUCKET_NAME}/lab4/
 ```
 
 Résultat attendu :
@@ -225,33 +267,22 @@ terraform.tfstate
 
 # 🧩 Partie D — Modifier une ressource hors Terraform
 
-## Étape D1 — Modifier un tag depuis la console AWS
-
 ```bash
 INSTANCE_ID=$(terraform output -raw instance_id)
 
-# Ajouter un tag manuellement (hors Terraform)
 aws ec2 create-tags \
   --resources $INSTANCE_ID \
   --tags Key=ModifiedOutside,Value=true
 ```
 
-## Étape D2 — Observer le comportement de Terraform
-
 ```bash
 terraform plan -var="username=<votre-prenom>"
 ```
 
-> 📋 Terraform détecte que la ressource a été modifiée hors de son contrôle et propose de **remettre** la configuration au desired state.
-
-## Étape D3 — Refresh du state
+> 📋 Terraform détecte que la ressource a été modifiée hors de son contrôle.
 
 ```bash
 terraform refresh -var="username=<votre-prenom>"
-```
-
-```bash
-# Vérifier que le state a capturé le tag
 terraform state show aws_instance.lab4_instance | grep ModifiedOutside
 ```
 
@@ -259,29 +290,15 @@ terraform state show aws_instance.lab4_instance | grep ModifiedOutside
 
 # 🧩 Partie E — Modifier dans le code Terraform
 
-## Étape E1 — Changer le type d'instance dans main.tf
-
-Dans `main.tf`, modifiez :
-
-```hcl
-resource "aws_instance" "lab4_instance" {
-  ...
-  instance_type = "t2.small"   # ← changer t2.micro en t2.small
-  ...
-}
-```
-
-## Étape E2 — Observer le plan
+Dans `main.tf`, changez `t2.micro` en `t2.small` :
 
 ```bash
 terraform plan -var="username=<votre-prenom>"
 ```
 
-> 📋 Terraform affiche qu'il va **modifier** l'instance (`~`) pour changer le type. C'est la différence entre **desired state** (code) et **current state** (AWS).
+> 📋 Terraform affiche qu'il va **modifier** l'instance (`~`) — c'est la différence entre **desired state** et **current state**.
 
-## Étape E3 — Annuler la modification
-
-Remettez `t2.micro` dans `main.tf` avant de continuer.
+Remettez `t2.micro` avant de continuer :
 
 ```bash
 terraform plan -var="username=<votre-prenom>"
@@ -293,7 +310,7 @@ Résultat attendu : `No changes. Infrastructure is up-to-date.`
 
 # 🧩 Partie F — Tester le locking S3
 
-Ouvrez **deux terminaux** simultanément dans le même dossier.
+Ouvrez **deux terminaux** dans `labs/lab4-state` :
 
 - **Terminal 1** : `terraform apply -var="username=<votre-prenom>"`
 - **Terminal 2** : `terraform apply -var="username=<votre-prenom>"` immédiatement après
@@ -303,23 +320,16 @@ Le Terminal 2 affiche :
 Error: Error acquiring the state lock
 ```
 
-> 💡 Le fichier `.tflock` créé par `use_lockfile = true` empêche deux opérations simultanées sur le même state.
-
-Vérifiez le fichier de lock dans S3 :
-
-```bash
-aws s3 ls s3://tf-training-<votre-prenom>-<account-id>/lab4/
-```
-
 ---
 
 # 🧩 Partie G — Nettoyage
 
 ```bash
+# Détruire les ressources du lab
 terraform destroy -var="username=<votre-prenom>"
 ```
 
-> ⚠️ Ne supprimez **pas** votre bucket S3 — il sera réutilisé dans tous les labs suivants !
+> ⚠️ Ne détruisez **pas** le bootstrap — votre bucket S3 sera réutilisé dans tous les labs suivants !
 
 ---
 
@@ -327,15 +337,16 @@ terraform destroy -var="username=<votre-prenom>"
 
 | # | Critère | Validé |
 |---|---------|--------|
-| 1 | Bucket S3 `tf-training-<prenom>-<account-id>` créé | ☐ |
-| 2 | `terraform init -backend-config` réussi | ☐ |
-| 3 | State visible dans S3 après `terraform apply` | ☐ |
-| 4 | `terraform plan` détecte la modification hors Terraform | ☐ |
-| 5 | `terraform refresh` capture le tag ajouté manuellement | ☐ |
-| 6 | `terraform plan` détecte le changement `t2.small` | ☐ |
-| 7 | Locking S3 bloque le 2ème `apply` simultané | ☐ |
-| 8 | `terraform destroy` supprime les ressources AWS | ☐ |
-| 9 | Bucket S3 conservé pour les labs suivants | ☐ |
+| 1 | Bucket S3 créé **avec Terraform** via le bootstrap | ☐ |
+| 2 | `terraform output bucket_name` retourne le nom du bucket | ☐ |
+| 3 | `terraform init -backend-config` réussi | ☐ |
+| 4 | State visible dans S3 après `terraform apply` | ☐ |
+| 5 | `terraform plan` détecte la modification hors Terraform | ☐ |
+| 6 | `terraform refresh` capture le tag ajouté manuellement | ☐ |
+| 7 | `terraform plan` détecte le changement `t2.small` | ☐ |
+| 8 | Locking S3 bloque le 2ème `apply` simultané | ☐ |
+| 9 | `terraform destroy` supprime les ressources du lab | ☐ |
+| 10 | Bucket S3 conservé pour les labs suivants | ☐ |
 
 ---
 
@@ -346,7 +357,7 @@ terraform destroy -var="username=<votre-prenom>"
 | `BucketAlreadyExists` | Nom de bucket déjà pris | Vérifier que le nom inclut bien votre prénom et account-id |
 | `Backend init error` | Bucket ou key incorrects | Vérifier les valeurs `-backend-config` |
 | `Error acquiring state lock` | Lock non libéré | `terraform force-unlock <ID>` |
-| `NoSuchBucket` | Bucket non créé | Relancer les commandes de bootstrap |
+| `NoSuchBucket` | Bucket non créé | Relancer le bootstrap |
 | `use_lockfile not supported` | Version Terraform < 1.11 | Vérifier `terraform version` |
 
 ---
