@@ -14,7 +14,7 @@ Ouvrez CloudShell et réinstallez Terraform si nécessaire :
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab3-state
+cd $HOME/terraform-training/lab03-state
 ```
 
 Créez les fichiers :

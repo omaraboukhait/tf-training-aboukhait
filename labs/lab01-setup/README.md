@@ -196,8 +196,8 @@ terraform-training-<prenom>/
 │   ├── devcontainer.json     ← Configuration du Codespace
 │   └── Dockerfile            ← Image utilisée (Terraform + AWS CLI)
 ├── labs/
-│   ├── lab1-setup/
-│   ├── lab2-basics/
+│   ├── lab01-setup/
+│   ├── lab02-basics/
 │   └── ...
 └── README.md
 ```

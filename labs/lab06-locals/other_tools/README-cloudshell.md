@@ -12,13 +12,15 @@
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab6-locals
+cd $HOME/terraform-training/lab06-locals
 ```
 
 ```bash
 cat > backend.tf << 'EOF'
 terraform {
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true
@@ -54,7 +56,7 @@ EOF
 
 cat > locals.tf << 'EOF'
 locals {
-  prefix        = "lab6-${var.username}-${var.environment}"
+  prefix        = "lab06-${var.username}-${var.environment}"
   instance_type = var.environment == "prod" ? "t2.small" : "t2.micro"
   common_tags = {
     Lab         = "lab6"

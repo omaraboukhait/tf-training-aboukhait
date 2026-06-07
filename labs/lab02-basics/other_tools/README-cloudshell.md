@@ -23,7 +23,7 @@ bash $HOME/install-terraform.sh
 Placez-vous dans le dossier du lab :
 
 ```bash
-cd $HOME/terraform-training/lab2-basics
+cd $HOME/terraform-training/lab02-basics
 ```
 
 Créez les fichiers du lab :

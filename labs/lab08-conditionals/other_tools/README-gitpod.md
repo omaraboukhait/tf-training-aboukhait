@@ -12,7 +12,7 @@
 Reprenez votre environnement GitPod → **https://gitpod.io/workspaces**
 
 ```bash
-cd labs/lab8-conditionals
+cd labs/lab08-conditionals
 ```
 
 ### `backend.tf`
@@ -65,7 +65,7 @@ variable "environment" {
 
 ```hcl
 locals {
-  prefix             = "lab8-${var.username}-${var.environment}"
+  prefix             = "lab08-${var.username}-${var.environment}"
   instance_type      = var.environment == "prod" ? "t2.small" : "t2.micro"
   instance_count     = var.environment == "prod" ? 2 : 1
   monitoring_enabled = var.environment == "prod" ? true : false

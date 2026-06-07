@@ -11,7 +11,7 @@
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab8-conditionals
+cd $HOME/terraform-training/lab08-conditionals
 ```
 
 ```bash
@@ -55,7 +55,7 @@ EOF
 
 cat > locals.tf << 'EOF'
 locals {
-  prefix             = "lab8-${var.username}-${var.environment}"
+  prefix             = "lab08-${var.username}-${var.environment}"
   instance_type      = var.environment == "prod" ? "t2.small" : "t2.micro"
   instance_count     = var.environment == "prod" ? 2 : 1
   monitoring_enabled = var.environment == "prod" ? true : false

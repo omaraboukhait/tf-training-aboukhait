@@ -13,7 +13,7 @@
 # 🧩 Étape 1 — Créer les fichiers
 
 ```bash
-cd labs/lab6-locals
+cd labs/lab06-locals
 ```
 
 ### `backend.tf`
@@ -86,7 +86,7 @@ variable "environment" {
 ```hcl
 locals {
   # Préfixe commun pour nommer toutes les ressources
-  prefix = "lab6-${var.username}-${var.environment}"
+  prefix = "lab06-${var.username}-${var.environment}"
 
   # Tags appliqués à toutes les ressources
   common_tags = {

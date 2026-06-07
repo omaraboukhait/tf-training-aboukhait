@@ -146,7 +146,7 @@ mkdir -p $HOME/terraform-training
 cd $HOME/terraform-training
 
 # Créer les dossiers des labs
-mkdir -p lab1-setup lab2-basics lab3-state lab4-modules lab5-remote-state
+mkdir -p lab01-setup lab02-basics lab3-state lab4-modules lab5-remote-state
 
 # Vérifier la structure
 ls -la
@@ -154,8 +154,8 @@ ls -la
 
 Résultat attendu :
 ```
-drwxr-xr-x  lab1-setup
-drwxr-xr-x  lab2-basics
+drwxr-xr-x  lab01-setup
+drwxr-xr-x  lab02-basics
 drwxr-xr-x  lab3-state
 drwxr-xr-x  lab4-modules
 drwxr-xr-x  lab5-remote-state

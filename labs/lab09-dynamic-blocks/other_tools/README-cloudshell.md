@@ -7,7 +7,7 @@
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab9-dynamic-blocks
+cd $HOME/terraform-training/lab09-dynamic-blocks
 ```
 
 > ⚠️ N'oubliez pas de remplacer `<votre-prenom>` par votre prénom dans `backend.tf` avant de lancer `terraform init`.

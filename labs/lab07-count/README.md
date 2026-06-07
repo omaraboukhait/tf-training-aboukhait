@@ -13,7 +13,7 @@
 # 🧩 Étape 1 — Créer les fichiers
 
 ```bash
-cd labs/lab7-count
+cd labs/lab07-count
 ```
 
 ### `backend.tf`
@@ -85,7 +85,7 @@ variable "instance_count" {
 
 ```hcl
 locals {
-  prefix = "lab7-${var.username}"
+  prefix = "lab07-${var.username}"
 
   common_tags = {
     Lab       = "lab7"

@@ -12,13 +12,15 @@
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab5-outputs
+cd $HOME/terraform-training/lab05-outputs
 ```
 
 ```bash
 cat > backend.tf << 'EOF'
 terraform {
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true

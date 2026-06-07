@@ -13,7 +13,7 @@
 Reprenez votre environnement GitPod → **https://gitpod.io/workspaces**
 
 ```bash
-cd labs/lab5-outputs
+cd labs/lab05-outputs
 ```
 
 Créez chaque fichier dans l'éditeur VS Code GitPod :

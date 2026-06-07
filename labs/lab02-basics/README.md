@@ -35,13 +35,13 @@ resource "<TYPE>" "<NOM_LOCAL>" {
 Placez-vous dans le dossier du lab :
 
 ```bash
-cd labs/lab2-basics
+cd labs/lab02-basics
 ```
 
 Créez les fichiers suivants :
 
 ```
-lab2-basics/
+lab02-basics/
 ├── versions.tf
 ├── variables.tf
 ├── main.tf

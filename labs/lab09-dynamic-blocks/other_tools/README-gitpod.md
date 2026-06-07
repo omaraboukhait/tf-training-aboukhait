@@ -8,7 +8,7 @@
 Reprenez votre environnement GitPod → **https://gitpod.io/workspaces**
 
 ```bash
-cd labs/lab9-dynamic-blocks
+cd labs/lab09-dynamic-blocks
 ```
 
 > ⚠️ N'oubliez pas de remplacer `<votre-prenom>` par votre prénom dans `backend.tf` avant de lancer `terraform init`.

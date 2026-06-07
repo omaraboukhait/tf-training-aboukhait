@@ -15,7 +15,7 @@
 # 🧩 Étape 1 — Structure et fichiers
 
 ```bash
-cd labs/lab5-outputs
+cd labs/lab05-outputs
 ```
 
 Créez les fichiers suivants :

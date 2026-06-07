@@ -12,7 +12,7 @@
 
 ```bash
 bash $HOME/install-terraform.sh
-cd $HOME/terraform-training/lab7-count
+cd $HOME/terraform-training/lab07-count
 ```
 
 ```bash
@@ -56,7 +56,7 @@ EOF
 
 cat > locals.tf << 'EOF'
 locals {
-  prefix      = "lab7-${var.username}"
+  prefix      = "lab07-${var.username}"
   common_tags = { Lab = "lab7", Username = var.username, ManagedBy = "Terraform" }
 }
 EOF

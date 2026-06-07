@@ -25,7 +25,7 @@ terraform version
 Placez-vous dans le dossier du lab :
 
 ```bash
-cd labs/lab2-basics
+cd labs/lab02-basics
 ```
 
 ---

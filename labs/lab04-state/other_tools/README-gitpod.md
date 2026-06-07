@@ -94,7 +94,7 @@ cat $HOME/tf-training-info.txt
 # 🧩 Partie B — Créer les fichiers du lab
 
 ```bash
-cd labs/lab4-state
+cd labs/lab04-state
 ```
 
 Créez les fichiers dans l'éditeur VS Code GitPod :
@@ -108,6 +108,8 @@ terraform {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
   }
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true

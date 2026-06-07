@@ -13,7 +13,7 @@
 # 🧩 Étape 1 — Créer les fichiers
 
 ```bash
-cd labs/lab9-dynamic-blocks
+cd labs/lab09-dynamic-blocks
 ```
 
 ### `backend.tf`
@@ -74,7 +74,7 @@ variable "region" {
 
 ```hcl
 locals {
-  prefix = "lab9-${var.username}"
+  prefix = "lab09-${var.username}"
 
   common_tags = {
     Lab       = "lab9"

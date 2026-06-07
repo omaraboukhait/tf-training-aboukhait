@@ -13,7 +13,7 @@
 # 🧩 Étape 1 — Créer les fichiers
 
 ```bash
-cd labs/lab8-conditionals
+cd labs/lab08-conditionals
 ```
 
 ### `backend.tf`
@@ -85,7 +85,7 @@ variable "environment" {
 
 ```hcl
 locals {
-  prefix = "lab8-${var.username}-${var.environment}"
+  prefix = "lab08-${var.username}-${var.environment}"
 
   # Conditionnel : type d'instance selon l'environnement
   instance_type = var.environment == "prod" ? "t2.small" : "t2.micro"

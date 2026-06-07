@@ -17,7 +17,7 @@
 Placez-vous dans le dossier du lab :
 
 ```bash
-cd labs/lab3-state
+cd labs/lab03-state
 ```
 
 Créez les fichiers :

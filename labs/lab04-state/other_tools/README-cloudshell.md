@@ -87,7 +87,7 @@ cat $HOME/tf-training-info.txt
 # 🧩 Partie B — Créer les fichiers du lab
 
 ```bash
-cd $HOME/terraform-training/lab4-state
+cd $HOME/terraform-training/lab04-state
 ```
 
 ```bash
@@ -98,6 +98,8 @@ terraform {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
   }
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true

@@ -19,7 +19,7 @@
 ## Étape A1 — Préparer le dossier bootstrap
 
 ```bash
-cd labs/lab4-state
+cd labs/lab04-state
 mkdir bootstrap && cd bootstrap
 ```
 
@@ -133,13 +133,13 @@ cat $HOME/tf-training-info.txt
 
 ```bash
 cd ..
-# Vous êtes dans labs/lab4-state
+# Vous êtes dans labs/lab04-state
 ```
 
 ## Étape B2 — Créer les fichiers
 
 ```
-lab4-state/
+lab04-state/
 ├── bootstrap/          ← déjà fait
 ├── versions.tf
 ├── variables.tf
@@ -161,6 +161,8 @@ terraform {
   }
 
   backend "s3" {
+    bucket       = "tf-training-<votre-prenom>-982908300187"
+    key          = "terraform.tfstate"
     region       = "eu-west-1"
     use_lockfile = true
     encrypt      = true
@@ -306,7 +308,7 @@ Résultat attendu : `No changes. Infrastructure is up-to-date.`
 
 # 🧩 Partie F — Tester le locking S3
 
-Ouvrez **deux terminaux** dans `labs/lab4-state` :
+Ouvrez **deux terminaux** dans `labs/lab04-state` :
 
 - **Terminal 1** : `terraform apply -var="username=<votre-prenom>"`
 - **Terminal 2** : `terraform apply -var="username=<votre-prenom>"` immédiatement après

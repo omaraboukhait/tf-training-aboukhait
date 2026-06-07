@@ -13,7 +13,7 @@
 Reprenez votre environnement GitPod → **https://gitpod.io/workspaces**
 
 ```bash
-cd labs/lab6-locals
+cd labs/lab06-locals
 ```
 
 ### `backend.tf`
@@ -68,7 +68,7 @@ variable "environment" {
 
 ```hcl
 locals {
-  prefix        = "lab6-${var.username}-${var.environment}"
+  prefix        = "lab06-${var.username}-${var.environment}"
   instance_type = var.environment == "prod" ? "t2.small" : "t2.micro"
   common_tags = {
     Lab         = "lab6"

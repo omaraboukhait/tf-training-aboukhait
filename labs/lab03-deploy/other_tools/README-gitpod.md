@@ -12,7 +12,7 @@
 
 ```bash
 # Sur https://gitpod.io/workspaces → Open
-cd labs/lab3-state
+cd labs/lab03-state
 ```
 
 Créez les fichiers suivants dans l'éditeur VS Code GitPod.
