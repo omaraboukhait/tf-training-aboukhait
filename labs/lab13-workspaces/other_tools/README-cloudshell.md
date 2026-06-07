@@ -1,4 +1,4 @@
-# 📘 Lab 13 — Workspaces (AWS CloudShell)
+# 📘 Lab 13 — Workspaces & Isolation du State (AWS CloudShell)
 
 > Le contenu de ce lab est identique à la version principale.
 > Référez-vous au fichier **README.md** dans le dossier parent pour les instructions complètes.

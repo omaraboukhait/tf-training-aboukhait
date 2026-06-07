@@ -1,4 +1,4 @@
-# 📘 Lab 11 — Provisioners : Déployer Nginx (GitPod)
+# 📘 Lab 11 — Déployer Nginx avec user_data (GitPod)
 
 > Le contenu de ce lab est identique à la version principale.
 > Référez-vous au fichier **README.md** dans le dossier parent pour les instructions complètes.
