@@ -9,6 +9,7 @@
 - Validé l'infrastructure avec le bloc **`check`** (assertions post-apply)
 - Géré les **secrets AWS** de manière sécurisée via les variables CI/CD
 - Utilisé `terraform plan -out=planfile` + `terraform apply planfile`
+- Compris et résolu un problème de **dépendance de destruction** avec `depends_on`
 - Mis en place un pipeline **CI/CD complet** avec GitHub Actions
 
 ---
@@ -20,8 +21,6 @@
 ```bash
 cd labs/lab15-advanced
 ```
-
-Créez le fichier `.gitignore` :
 
 ```bash
 cat > .gitignore << 'EOF'
@@ -129,7 +128,7 @@ locals {
 }
 ```
 
-### `main.tf`
+### `main.tf` — Version initiale (sans `depends_on`)
 
 ```hcl
 data "aws_ami" "amazon_linux" {
@@ -202,32 +201,11 @@ output "security_group_id" {
 
 ```bash
 terraform init
-```
-
-Inspectez le fichier généré :
-
-```bash
 cat .terraform.lock.hcl
-```
-
-Résultat attendu :
-```hcl
-provider "registry.terraform.io/hashicorp/aws" {
-  version     = "5.x.x"
-  constraints = "~> 5.0"
-  hashes = [
-    "h1:xxxx...",
-  ]
-}
 ```
 
 > 💡 Le fichier `.terraform.lock.hcl` **verrouille les versions exactes** des providers.
 > Il doit être **commité dans Git** — contrairement au dossier `.terraform/` qui lui ne doit jamais l'être.
-
-```bash
-# Vérifier ce qui sera commité (doit montrer .terraform.lock.hcl mais PAS .terraform/)
-git status
-```
 
 ---
 
@@ -235,9 +213,7 @@ git status
 
 ```bash
 # Générer le plan dans un fichier
-terraform plan \
-  -var="username=<votre-prenom>" \
-  -out=tfplan
+terraform plan -var="username=<votre-prenom>" -out=tfplan
 
 # Inspecter le plan
 terraform show tfplan
@@ -251,7 +227,115 @@ terraform apply tfplan
 
 ---
 
-# 🧩 Étape 5 — Bloc `moved` (renommer sans recréer)
+# 🧩 Étape 5 — Découvrir le problème `depends_on`
+
+## Étape 5.1 — Lancer le destroy sans `depends_on`
+
+```bash
+terraform destroy -var="username=<votre-prenom>"
+```
+
+Observez ce qui se passe — après quelques minutes vous verrez :
+
+```
+aws_security_group.lab15_sg: Still destroying... [id=sg-xxx, 1m00s elapsed]
+aws_security_group.lab15_sg: Still destroying... [id=sg-xxx, 2m00s elapsed]
+aws_security_group.lab15_sg: Still destroying... [id=sg-xxx, 3m00s elapsed]
+...
+```
+
+> 📋 **Pourquoi ?** Terraform détruit les ressources **en parallèle** par défaut. Il essaie de supprimer l'instance EC2 ET le Security Group en même temps. Mais AWS refuse de supprimer un Security Group tant qu'une instance y est encore attachée — même si cette instance est en cours de suppression.
+
+> 📋 **Résultat :** Terraform attend indéfiniment qu'AWS libère le Security Group, ce qui peut prendre très longtemps.
+
+## Étape 5.2 — Débloquer la situation
+
+Si vous êtes bloqué, appuyez sur `Ctrl+C` puis terminez l'instance manuellement :
+
+```bash
+INSTANCE_ID=$(terraform state show aws_instance.lab15_instance | grep '"id"' | head -1 | awk -F'"' '{print $4}')
+
+aws ec2 terminate-instances --instance-ids $INSTANCE_ID
+
+# Attendre que l'instance soit terminée
+aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
+
+# Relancer le destroy
+terraform destroy -var="username=<votre-prenom>"
+```
+
+---
+
+# 🧩 Étape 6 — Solution : `depends_on`
+
+## Étape 6.1 — Comprendre `depends_on`
+
+Terraform gère les dépendances **implicites** automatiquement quand une ressource référence une autre (`aws_instance` référence `aws_security_group.lab15_sg.id` → Terraform sait créer le SG avant l'instance).
+
+Mais pour la **destruction**, Terraform ne connaît pas toujours l'ordre correct. C'est là qu'intervient `depends_on` — une **dépendance explicite**.
+
+## Étape 6.2 — Corriger `main.tf` avec `depends_on`
+
+Mettez à jour le bloc `aws_security_group` dans `main.tf` :
+
+```hcl
+resource "aws_security_group" "lab15_sg" {
+  name        = "${local.prefix}-sg"
+  description = "Security group Lab 15 - ${var.username}"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # depends_on force Terraform à détruire l'instance AVANT le Security Group
+  depends_on = [aws_instance.lab15_instance]
+
+  tags = merge(local.common_tags, {
+    Name = "${local.prefix}-sg"
+  })
+}
+```
+
+> 💡 `depends_on = [aws_instance.lab15_instance]` dit à Terraform :
+> - **Création** : créer le SG avant l'instance (ordre normal déjà respecté)
+> - **Destruction** : détruire l'instance AVANT de supprimer le SG ✅
+
+## Étape 6.3 — Redéployer et tester le destroy
+
+```bash
+terraform apply -var="username=<votre-prenom>"
+```
+
+Maintenant lancez le destroy :
+
+```bash
+terraform destroy -var="username=<votre-prenom>"
+```
+
+Observez la différence — Terraform détruit maintenant l'instance EN PREMIER :
+
+```
+aws_instance.lab15_instance: Destroying...
+aws_instance.lab15_instance: Still destroying... [10s elapsed]
+aws_instance.lab15_instance: Destruction complete after 32s
+aws_security_group.lab15_sg: Destroying...    ← seulement après l'instance
+aws_security_group.lab15_sg: Destruction complete after 1s ✅
+```
+
+---
+
+# 🧩 Étape 7 — Bloc `moved` (renommer sans recréer)
 
 Dans `main.tf`, renommez `lab15_instance` en `web_server` :
 
@@ -266,6 +350,12 @@ resource "aws_instance" "web_server" {    # ← renommé
     Name = "${local.prefix}-instance"
   })
 }
+```
+
+Mettez à jour le `depends_on` dans `aws_security_group` :
+
+```hcl
+depends_on = [aws_instance.web_server]   # ← nom mis à jour
 ```
 
 Mettez à jour `outputs.tf` :
@@ -289,8 +379,6 @@ moved {
 }
 ```
 
-Vérifiez que Terraform ne recrée pas la ressource :
-
 ```bash
 terraform plan -var="username=<votre-prenom>"
 ```
@@ -307,7 +395,7 @@ terraform apply -var="username=<votre-prenom>"
 
 ---
 
-# 🧩 Étape 6 — Bloc `check` (assertions post-apply)
+# 🧩 Étape 8 — Bloc `check` (assertions post-apply)
 
 Ajoutez dans `main.tf` :
 
@@ -343,7 +431,7 @@ terraform apply -var="username=<votre-prenom>"
 
 ---
 
-# 🧩 Étape 7 — Gestion des secrets (bonnes pratiques)
+# 🧩 Étape 9 — Gestion des secrets (bonnes pratiques)
 
 > 🔴 **Règle absolue : ne jamais mettre de secrets dans le code ou `terraform.tfvars`.**
 
@@ -364,9 +452,9 @@ En CI/CD, les secrets sont injectés via **GitHub Actions Secrets** — jamais e
 
 ---
 
-# 🧩 Étape 8 — CI/CD avec GitHub Actions
+# 🧩 Étape 10 — CI/CD avec GitHub Actions
 
-## Étape 8.1 — Configurer les secrets GitHub
+## Étape 10.1 — Configurer les secrets GitHub
 
 Dans votre repo GitHub :
 1. **Settings** → **Secrets and variables** → **Actions**
@@ -374,10 +462,9 @@ Dans votre repo GitHub :
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
 
-## Étape 8.2 — Créer le workflow à la racine du repo
+## Étape 10.2 — Créer le workflow à la racine du repo
 
 > ⚠️ Le dossier `.github/workflows/` doit être à la **racine du repo**, pas dans `labs/lab15-advanced/`.
-> Se placer à la racine avant de créer le workflow.
 
 ```bash
 # Se placer à la racine du repo
@@ -450,7 +537,7 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply tfplan
-        if: github.event.inputs.action == 'apply' || github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event.inputs.action == 'apply'
 
       - name: Terraform Destroy
         run: |
@@ -459,77 +546,59 @@ jobs:
         if: github.event.inputs.action == 'destroy'
 ```
 
-> 💡 **Architecture du pipeline — tout dans un seul job :**
-> - `plan` est toujours exécuté en premier
-> - `apply` utilise le `tfplan` généré juste avant dans le même job — pas de problème de fichier introuvable
-> - `destroy` génère son propre plan de destruction puis l'applique
+> 💡 **Tout dans un seul job** — `plan` et `apply` s'exécutent dans le même environnement.
+> Si `plan` et `apply` étaient dans des jobs séparés, le fichier `tfplan` serait introuvable dans le job `apply` car chaque job repart d'un environnement vierge.
 
-> ⚠️ **Erreur fréquente :** si `plan` et `apply` sont dans des jobs séparés, le fichier `tfplan` n'existe pas dans le job `apply` car chaque job repart d'un environnement vierge. C'est pourquoi tout est dans un seul job ici.
+> ⚠️ **L'apply n'est jamais automatique** — un push sur `main` déclenche uniquement le `plan`. Pour appliquer ou détruire, il faut toujours passer par `workflow_dispatch` et choisir explicitement l'action. Cela évite toute destruction accidentelle de l'infrastructure.
 
-## Étape 8.3 — Vérifier et commiter
+## Étape 10.3 — Vérifier et commiter
 
 ```bash
-# Revenir à la racine du repo
 cd /workspaces/tf-training-<votre-prenom>
 
-# Vérifier ce qui sera commité AVANT de commit
+# Vérifier ce qui sera commité
 git status
-```
+# ✅ .github/workflows/terraform.yml
+# ✅ labs/lab15-advanced/.gitignore
+# ✅ labs/lab15-advanced/.terraform.lock.hcl
+# ✅ labs/lab15-advanced/*.tf
+# ❌ NE PAS voir : .terraform/, tfplan
 
-Résultat attendu :
-```
-✅ .github/workflows/terraform.yml
-✅ labs/lab15-advanced/.gitignore
-✅ labs/lab15-advanced/.terraform.lock.hcl
-✅ labs/lab15-advanced/backend.tf, main.tf, etc.
-❌ NE PAS voir : .terraform/, tfplan
-```
-
-> 🔴 Si `.terraform/` ou `tfplan` apparaissent dans `git status` — STOP.
-> Vérifiez que le `.gitignore` est bien présent dans `labs/lab15-advanced/`.
-
-```bash
 git add .
 git commit -m "feat: lab15 advanced terraform + CI/CD"
 git push origin main
 ```
 
-## Étape 8.4 — Observer le pipeline
-
-1. Allez sur votre repo GitHub → onglet **Actions**
-2. Le pipeline `Terraform CI/CD` se déclenche automatiquement sur le push
-3. Cliquez pour voir les logs de chaque étape
-
 ---
 
-# 🧩 Étape 9 — Tester le workflow complet
+# 🧩 Étape 11 — Tester le workflow
 
-## Scénario 1 — Plan automatique sur Push
+## Scénario 1 — Plan sur Push
 
 ```bash
-# Modifier un tag dans main.tf puis commiter
-git add .
-git commit -m "test: modifier tag pour déclencher le pipeline"
-git push origin main
+git add . && git commit -m "test: declencher pipeline" && git push origin main
 ```
 
-> 📋 Le pipeline se déclenche et exécute `plan` + `apply` automatiquement.
+> 📋 Le pipeline exécute uniquement `terraform plan` — aucune ressource n'est créée ou détruite automatiquement.
 
-## Scénario 2 — Apply manuel via workflow_dispatch
-
-1. GitHub → **Actions** → **Terraform CI/CD**
-2. **Run workflow** → sélectionnez `apply` → **Run workflow**
-
-> 📋 Le pipeline exécute `plan` puis `apply` dans le même job — le fichier `tfplan` est disponible.
-
-## Scénario 3 — Destroy via workflow_dispatch
+## Scénario 2 — Apply manuel (créer / mettre à jour)
 
 1. GitHub → **Actions** → **Terraform CI/CD**
-2. **Run workflow** → sélectionnez `destroy` → **Run workflow**
+2. **Run workflow** → sélectionnez **`apply`** → **Run workflow**
+
+> 📋 Le pipeline exécute `plan` puis `apply` — les ressources sont créées ou mises à jour.
+
+## Scénario 3 — Destroy manuel (détruire)
+
+1. GitHub → **Actions** → **Terraform CI/CD**
+2. **Run workflow** → sélectionnez **`destroy`** → **Run workflow**
+
+> 📋 Le pipeline exécute `plan -destroy` puis `apply` — toutes les ressources sont détruites.
+> ⚠️ Cette action est irréversible — à utiliser uniquement en fin de lab.
 
 ---
 
-# 🧩 Étape 10 — Nettoyage
+# 🧩 Étape 12 — Nettoyage
 
 ```bash
 terraform destroy -var="username=<votre-prenom>"
@@ -546,12 +615,14 @@ rm -f tfplan tfplan-destroy
 | 2 | `.terraform/` et `tfplan` absents du repo GitHub | ☐ |
 | 3 | `.terraform.lock.hcl` présent et commité | ☐ |
 | 4 | `terraform plan -out=tfplan` + `terraform apply tfplan` fonctionne | ☐ |
-| 5 | Bloc `moved` renomme sans recréer (`0 to destroy`) | ☐ |
-| 6 | Bloc `check` valide l'état après apply | ☐ |
-| 7 | Secrets AWS dans GitHub Actions Secrets (jamais dans le code) | ☐ |
-| 8 | `.github/workflows/` à la **racine** du repo | ☐ |
-| 9 | Pipeline GitHub Actions se déclenche sur push | ☐ |
-| 10 | Apply et Destroy via `workflow_dispatch` fonctionnent | ☐ |
+| 5 | Problème de destroy sans `depends_on` observé | ☐ |
+| 6 | `depends_on` résout le problème — instance détruite avant le SG | ☐ |
+| 7 | Bloc `moved` renomme sans recréer (`0 to destroy`) | ☐ |
+| 8 | Bloc `check` valide l'état après apply | ☐ |
+| 9 | Secrets AWS dans GitHub Actions Secrets (jamais dans le code) | ☐ |
+| 10 | `.github/workflows/` à la **racine** du repo | ☐ |
+| 11 | Pipeline GitHub Actions se déclenche sur push | ☐ |
+| 12 | Apply et Destroy via `workflow_dispatch` fonctionnent | ☐ |
 
 ---
 
@@ -559,12 +630,12 @@ rm -f tfplan tfplan-destroy
 
 | Problème | Cause | Solution |
 |----------|-------|----------|
+| SG bloqué en destroy > 5 min | Instance encore attachée au SG | Ajouter `depends_on = [aws_instance.web_server]` dans le SG |
 | `File exceeds 100MB` | `.terraform/` commité | Ajouter `.gitignore` avant `git add` |
-| `stat tfplan: no such file or directory` | Plan et Apply dans des jobs séparés | Utiliser un seul job — le `tfplan` doit être généré et utilisé dans le même job |
+| `stat tfplan: no such file or directory` | Plan et Apply dans des jobs séparés | Utiliser un seul job dans le workflow |
 | Pipeline introuvable dans Actions | `.github/` dans le mauvais dossier | Placer `.github/workflows/` à la racine du repo |
-| `fmt -check` échoue | Code mal formaté | Lancer `terraform fmt -recursive` localement avant de commiter |
+| `fmt -check` échoue | Code mal formaté | Lancer `terraform fmt -recursive` localement |
 | `moved` recrée la ressource | Mauvais nom dans `from` | Vérifier avec `terraform state list` |
-| Secrets visibles dans les logs | Variable affichée avec `echo` | Ne jamais afficher les variables sensibles |
 
 ---
 
