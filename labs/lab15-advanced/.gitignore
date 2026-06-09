@@ -1,0 +1,14 @@
+# Dossier providers Terraform (très lourd - jamais commiter)
+.terraform/
+
+# Plan files (contiennent des secrets)
+tfplan
+tfplan-destroy
+*.tfplan
+
+# State local (utiliser le remote state S3)
+terraform.tfstate
+terraform.tfstate.backup
+
+# Variables sensibles
+*.auto.tfvars

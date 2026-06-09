@@ -13,11 +13,41 @@
 
 ---
 
-# 🧩 Étape 1 — Créer les fichiers
+# 🧩 Étape 1 — Créer le .gitignore AVANT tout
+
+> 🔴 **Cette étape est critique — à faire en premier avant tout `git add`.**
 
 ```bash
 cd labs/lab15-advanced
 ```
+
+Créez le fichier `.gitignore` :
+
+```bash
+cat > .gitignore << 'EOF'
+# Dossier providers Terraform (très lourd ~700MB - jamais commiter)
+.terraform/
+
+# Plan files (contiennent des secrets - jamais commiter)
+tfplan
+tfplan-destroy
+*.tfplan
+
+# State local
+terraform.tfstate
+terraform.tfstate.backup
+
+# Variables sensibles
+*.auto.tfvars
+EOF
+```
+
+> 💡 Le dossier `.terraform/` contient les binaires des providers (~700MB pour AWS) — GitHub bloque les fichiers > 100MB.
+> Le fichier `tfplan` contient des credentials en clair — ne jamais le commiter.
+
+---
+
+# 🧩 Étape 2 — Créer les fichiers Terraform
 
 ### `backend.tf`
 
@@ -168,7 +198,7 @@ output "security_group_id" {
 
 ---
 
-# 🧩 Étape 2 — Dependency Lock File (`terraform.lock.hcl`)
+# 🧩 Étape 3 — Dependency Lock File (`terraform.lock.hcl`)
 
 ```bash
 terraform init
@@ -191,58 +221,37 @@ provider "registry.terraform.io/hashicorp/aws" {
 }
 ```
 
-> 💡 Le fichier `.terraform.lock.hcl` **verrouille les versions exactes** des providers utilisés.
-> Il doit être **commité dans Git** pour garantir que tous les membres de l'équipe et le CI/CD utilisent exactement les mêmes versions.
-> Ne jamais l'ajouter au `.gitignore` !
+> 💡 Le fichier `.terraform.lock.hcl` **verrouille les versions exactes** des providers.
+> Il doit être **commité dans Git** — contrairement au dossier `.terraform/` qui lui ne doit jamais l'être.
 
 ```bash
-# Mettre à jour le lock file si nécessaire
-terraform init -upgrade
+# Vérifier ce qui sera commité (doit montrer .terraform.lock.hcl mais PAS .terraform/)
+git status
 ```
 
 ---
 
-# 🧩 Étape 3 — Plan file : `terraform plan -out`
-
-La bonne pratique en CI/CD est de **séparer le plan et l'apply** :
+# 🧩 Étape 4 — Plan file : `terraform plan -out`
 
 ```bash
-terraform init
-
-# Étape 1 : Générer le plan et le sauvegarder dans un fichier
+# Générer le plan dans un fichier
 terraform plan \
   -var="username=<votre-prenom>" \
   -out=tfplan
-```
 
-```bash
-# Inspecter le plan sauvegardé
+# Inspecter le plan
 terraform show tfplan
-```
 
-```bash
-# Étape 2 : Appliquer exactement ce qui a été planifié
+# Appliquer exactement ce plan
 terraform apply tfplan
 ```
 
-> 💡 Cette approche garantit que ce qui a été **validé** lors du plan est **exactement** ce qui sera appliqué — aucune surprise si l'infrastructure a changé entre les deux.
-> C'est le pattern standard en CI/CD : `plan` dans la PR, `apply` après merge.
-
-> ⚠️ Le fichier `tfplan` contient des informations sensibles (credentials, outputs) — ne jamais le commiter dans Git. Ajoutez `tfplan` à votre `.gitignore`.
+> 💡 Le fichier `tfplan` est dans le `.gitignore` — il ne sera jamais commité.
+> C'est le pattern CI/CD standard : `plan` dans la PR, `apply` après merge.
 
 ---
 
-# 🧩 Étape 4 — Bloc `moved` (renommer sans recréer)
-
-## Étape 4.1 — Situation initiale
-
-Après l'apply, votre state contient :
-```
-aws_instance.lab15_instance
-aws_security_group.lab15_sg
-```
-
-## Étape 4.2 — Renommer la ressource dans le code
+# 🧩 Étape 5 — Bloc `moved` (renommer sans recréer)
 
 Dans `main.tf`, renommez `lab15_instance` en `web_server` :
 
@@ -259,7 +268,7 @@ resource "aws_instance" "web_server" {    # ← renommé
 }
 ```
 
-Mettez aussi à jour `outputs.tf` :
+Mettez à jour `outputs.tf` :
 
 ```hcl
 output "instance_id" {
@@ -271,8 +280,6 @@ output "instance_public_ip" {
 }
 ```
 
-## Étape 4.3 — Ajouter le bloc `moved`
-
 Créez `moved.tf` :
 
 ```hcl
@@ -282,7 +289,7 @@ moved {
 }
 ```
 
-## Étape 4.4 — Vérifier que Terraform ne recrée pas la ressource
+Vérifiez que Terraform ne recrée pas la ressource :
 
 ```bash
 terraform plan -var="username=<votre-prenom>"
@@ -294,17 +301,13 @@ Résultat attendu :
 Plan: 0 to add, 0 to change, 0 to destroy.
 ```
 
-> 💡 Sans le bloc `moved`, Terraform aurait **détruit** `lab15_instance` et **recréé** `web_server` — ce qui cause une interruption de service. Le bloc `moved` l'informe que c'est un simple renommage.
-
 ```bash
 terraform apply -var="username=<votre-prenom>"
 ```
 
 ---
 
-# 🧩 Étape 5 — Bloc `check` (assertions post-apply)
-
-Le bloc `check` permet de **valider l'état de l'infrastructure** après le déploiement.
+# 🧩 Étape 6 — Bloc `check` (assertions post-apply)
 
 Ajoutez dans `main.tf` :
 
@@ -327,7 +330,7 @@ check "security_group_exists" {
 
   assert {
     condition     = data.aws_security_group.verify.id != ""
-    error_message = "Le Security Group n'existe pas ou n'est pas accessible !"
+    error_message = "Le Security Group n'existe pas !"
   }
 }
 ```
@@ -336,53 +339,50 @@ check "security_group_exists" {
 terraform apply -var="username=<votre-prenom>"
 ```
 
-> 💡 Contrairement aux validations de variables, le bloc `check` s'exécute **après** le déploiement et vérifie l'état réel des ressources. Un échec affiche un **warning** mais n'arrête pas l'apply.
+> 💡 Le bloc `check` s'exécute **après** le déploiement et vérifie l'état réel. Un échec affiche un **warning** mais n'arrête pas l'apply.
 
 ---
 
-# 🧩 Étape 6 — Gestion des secrets (bonnes pratiques)
+# 🧩 Étape 7 — Gestion des secrets (bonnes pratiques)
 
-> 🔴 **Règle absolue : ne jamais mettre de secrets dans `terraform.tfvars` ou dans le code.**
-
-## Ce qu'il ne faut jamais faire
+> 🔴 **Règle absolue : ne jamais mettre de secrets dans le code ou `terraform.tfvars`.**
 
 ```hcl
-# ❌ INTERDIT — ne jamais faire ça
+# ❌ INTERDIT
 variable "aws_access_key" {
   default = "AKIAXXXXXXXXXXXXXXXXX"
 }
 ```
 
-## La bonne approche : variables d'environnement
-
 ```bash
-# ✅ Credentials via variables d'environnement
+# ✅ Variables d'environnement localement
 export AWS_ACCESS_KEY_ID="AKIAXXXXXXXXXXXXXXXXX"
 export AWS_SECRET_ACCESS_KEY="xxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
-## En CI/CD : GitHub Actions Secrets
-
-Les secrets sont stockés dans **GitHub → Settings → Secrets and variables → Actions** et injectés comme variables d'environnement dans le pipeline — jamais en clair dans le code.
-
-> ✅ Les secrets GitHub Actions sont **chiffrés**, non visibles dans les logs, et non accessibles en dehors des workflows.
+En CI/CD, les secrets sont injectés via **GitHub Actions Secrets** — jamais en clair dans le code.
 
 ---
 
-# 🧩 Étape 7 — CI/CD avec GitHub Actions
+# 🧩 Étape 8 — CI/CD avec GitHub Actions
 
-## Étape 7.1 — Configurer les secrets GitHub
+## Étape 8.1 — Configurer les secrets GitHub
 
 Dans votre repo GitHub :
 1. **Settings** → **Secrets and variables** → **Actions**
-2. Cliquez **New repository secret**
-3. Ajoutez les deux secrets :
-   - `AWS_ACCESS_KEY_ID` → votre Access Key ID
-   - `AWS_SECRET_ACCESS_KEY` → votre Secret Access Key
+2. **New repository secret** — ajoutez :
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
 
-## Étape 7.2 — Créer le workflow
+## Étape 8.2 — Créer le workflow à la racine du repo
+
+> ⚠️ Le dossier `.github/workflows/` doit être à la **racine du repo**, pas dans `labs/lab15-advanced/`.
+> Se placer à la racine avant de créer le workflow.
 
 ```bash
+# Se placer à la racine du repo
+cd /workspaces/tf-training-<votre-prenom>
+
 mkdir -p .github/workflows
 ```
 
@@ -446,23 +446,11 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: |
-          terraform plan \
-            -var="environment=dev" \
-            -out=tfplan
-        if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan' || github.event_name == 'push'
-
-      - name: Upload Plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: ${{ env.TF_WORKING_DIR }}/tfplan
-          retention-days: 1
-        if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan' || github.event_name == 'push'
+        run: terraform plan -var="environment=dev" -out=tfplan
 
       - name: Terraform Apply
         run: terraform apply tfplan
-        if: github.event.inputs.action == 'apply'
+        if: github.event.inputs.action == 'apply' || github.ref == 'refs/heads/main' && github.event_name == 'push'
 
       - name: Terraform Destroy
         run: |
@@ -471,7 +459,34 @@ jobs:
         if: github.event.inputs.action == 'destroy'
 ```
 
-## Étape 7.3 — Commiter et pousser
+> 💡 **Architecture du pipeline — tout dans un seul job :**
+> - `plan` est toujours exécuté en premier
+> - `apply` utilise le `tfplan` généré juste avant dans le même job — pas de problème de fichier introuvable
+> - `destroy` génère son propre plan de destruction puis l'applique
+
+> ⚠️ **Erreur fréquente :** si `plan` et `apply` sont dans des jobs séparés, le fichier `tfplan` n'existe pas dans le job `apply` car chaque job repart d'un environnement vierge. C'est pourquoi tout est dans un seul job ici.
+
+## Étape 8.3 — Vérifier et commiter
+
+```bash
+# Revenir à la racine du repo
+cd /workspaces/tf-training-<votre-prenom>
+
+# Vérifier ce qui sera commité AVANT de commit
+git status
+```
+
+Résultat attendu :
+```
+✅ .github/workflows/terraform.yml
+✅ labs/lab15-advanced/.gitignore
+✅ labs/lab15-advanced/.terraform.lock.hcl
+✅ labs/lab15-advanced/backend.tf, main.tf, etc.
+❌ NE PAS voir : .terraform/, tfplan
+```
+
+> 🔴 Si `.terraform/` ou `tfplan` apparaissent dans `git status` — STOP.
+> Vérifiez que le `.gitignore` est bien présent dans `labs/lab15-advanced/`.
 
 ```bash
 git add .
@@ -479,49 +494,44 @@ git commit -m "feat: lab15 advanced terraform + CI/CD"
 git push origin main
 ```
 
-## Étape 7.4 — Observer le pipeline
+## Étape 8.4 — Observer le pipeline
 
 1. Allez sur votre repo GitHub → onglet **Actions**
-2. Vous voyez le pipeline `Terraform CI/CD` qui s'exécute
-3. Cliquez dessus pour voir les logs de chaque étape
+2. Le pipeline `Terraform CI/CD` se déclenche automatiquement sur le push
+3. Cliquez pour voir les logs de chaque étape
 
 ---
 
-# 🧩 Étape 8 — Tester le workflow complet
+# 🧩 Étape 9 — Tester le workflow complet
 
 ## Scénario 1 — Plan automatique sur Push
 
 ```bash
-# Modifier un tag dans main.tf
-# Puis commiter et pousser
+# Modifier un tag dans main.tf puis commiter
 git add .
-git commit -m "test: modifier un tag pour déclencher le pipeline"
+git commit -m "test: modifier tag pour déclencher le pipeline"
 git push origin main
 ```
 
-> 📋 Le pipeline se déclenche automatiquement et exécute `terraform plan`.
+> 📋 Le pipeline se déclenche et exécute `plan` + `apply` automatiquement.
 
 ## Scénario 2 — Apply manuel via workflow_dispatch
 
 1. GitHub → **Actions** → **Terraform CI/CD**
-2. Cliquez **Run workflow**
-3. Sélectionnez `apply` dans le menu déroulant
-4. Cliquez **Run workflow**
+2. **Run workflow** → sélectionnez `apply` → **Run workflow**
+
+> 📋 Le pipeline exécute `plan` puis `apply` dans le même job — le fichier `tfplan` est disponible.
 
 ## Scénario 3 — Destroy via workflow_dispatch
 
 1. GitHub → **Actions** → **Terraform CI/CD**
-2. Cliquez **Run workflow**
-3. Sélectionnez `destroy`
-4. Cliquez **Run workflow**
+2. **Run workflow** → sélectionnez `destroy` → **Run workflow**
 
 ---
 
-# 🧩 Étape 9 — Nettoyage
+# 🧩 Étape 10 — Nettoyage
 
 ```bash
-# Via le workflow GitHub Actions (destroy)
-# OU localement :
 terraform destroy -var="username=<votre-prenom>"
 rm -f tfplan tfplan-destroy
 ```
@@ -532,16 +542,16 @@ rm -f tfplan tfplan-destroy
 
 | # | Critère | Validé |
 |---|---------|--------|
-| 1 | `.terraform.lock.hcl` présent et commité dans Git | ☐ |
-| 2 | `terraform plan -out=tfplan` + `terraform apply tfplan` fonctionne | ☐ |
-| 3 | Bloc `moved` renomme la ressource sans la recréer (`0 to destroy`) | ☐ |
-| 4 | Bloc `check` valide l'état de l'instance après apply | ☐ |
-| 5 | Secrets AWS dans GitHub Actions Secrets (jamais dans le code) | ☐ |
-| 6 | Pipeline GitHub Actions se déclenche sur push | ☐ |
-| 7 | `terraform fmt -check` passe dans le pipeline | ☐ |
-| 8 | `terraform validate` passe dans le pipeline | ☐ |
-| 9 | Apply manuel via `workflow_dispatch` fonctionne | ☐ |
-| 10 | Destroy via `workflow_dispatch` supprime les ressources | ☐ |
+| 1 | `.gitignore` créé **avant** le premier `git add` | ☐ |
+| 2 | `.terraform/` et `tfplan` absents du repo GitHub | ☐ |
+| 3 | `.terraform.lock.hcl` présent et commité | ☐ |
+| 4 | `terraform plan -out=tfplan` + `terraform apply tfplan` fonctionne | ☐ |
+| 5 | Bloc `moved` renomme sans recréer (`0 to destroy`) | ☐ |
+| 6 | Bloc `check` valide l'état après apply | ☐ |
+| 7 | Secrets AWS dans GitHub Actions Secrets (jamais dans le code) | ☐ |
+| 8 | `.github/workflows/` à la **racine** du repo | ☐ |
+| 9 | Pipeline GitHub Actions se déclenche sur push | ☐ |
+| 10 | Apply et Destroy via `workflow_dispatch` fonctionnent | ☐ |
 
 ---
 
@@ -549,12 +559,12 @@ rm -f tfplan tfplan-destroy
 
 | Problème | Cause | Solution |
 |----------|-------|----------|
-| `lock file not committed` | `.terraform.lock.hcl` dans `.gitignore` | Retirer du `.gitignore` et commiter |
-| `plan file stale` | State modifié entre plan et apply | Relancer `terraform plan -out=tfplan` |
-| `moved block` recrée la ressource | Mauvais nom dans `from` | Vérifier avec `terraform state list` |
-| `check` échoue en warning | Instance pas encore running | Attendre 30s et relancer `terraform apply` |
-| Secrets visibles dans les logs | `echo` ou `print` d'une variable | Ne jamais afficher les variables sensibles |
-| Pipeline échoue sur `fmt -check` | Code mal formaté | Lancer `terraform fmt -recursive` localement |
+| `File exceeds 100MB` | `.terraform/` commité | Ajouter `.gitignore` avant `git add` |
+| `stat tfplan: no such file or directory` | Plan et Apply dans des jobs séparés | Utiliser un seul job — le `tfplan` doit être généré et utilisé dans le même job |
+| Pipeline introuvable dans Actions | `.github/` dans le mauvais dossier | Placer `.github/workflows/` à la racine du repo |
+| `fmt -check` échoue | Code mal formaté | Lancer `terraform fmt -recursive` localement avant de commiter |
+| `moved` recrée la ressource | Mauvais nom dans `from` | Vérifier avec `terraform state list` |
+| Secrets visibles dans les logs | Variable affichée avec `echo` | Ne jamais afficher les variables sensibles |
 
 ---
 
